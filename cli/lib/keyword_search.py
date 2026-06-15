@@ -1,5 +1,5 @@
 import string
-
+import sys
 import os
 
 from nltk.stem import PorterStemmer
@@ -10,15 +10,20 @@ import pickle
 
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
-    movies = load_movies()
-    results = []
-    for movie in movies:
-        query_tokens = tokenize_text(query)
-        title_tokens = tokenize_text(movie["title"])
-        if has_matching_token(query_tokens, title_tokens):
-            results.append(movie)
+    idx = InvertedIndex()
+    idx.load()
+    query_tokens = tokenize_text(query)
+    seen, results = set(), []
+    for query_token in query_tokens:
+        matching_doc_ids = idx.get_documents(query_token)
+        for doc_id in matching_doc_ids:
+            if doc_id in seen:
+                continue
+            seen.add(doc_id)
+            doc = idx.docmap[doc_id]
+            results.append(doc)
             if len(results) >= limit:
-                break
+                return results
 
     return results
 
@@ -96,10 +101,25 @@ class InvertedIndex:
             pickle.dump(self.index, idx_file)
         with open(docmap_file, "wb") as dm_file:
             pickle.dump(self.docmap, dm_file)
+    
+    def load(self):
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        index_file = CACHE_DIR + "/index.pkl"
+        docmap_file = CACHE_DIR + "/docmap.pkl"
+        try:
+            with open(index_file, "rb") as idx_file:
+                self.index = pickle.load(idx_file)
+        except FileNotFoundError:
+            print(f"Error: The file '{index_file}' was not found.")
+            sys.exit(1)
+        try:
+            with open(docmap_file, "rb") as dm_file:
+                self.docmap = pickle.load(dm_file)       
+        except FileNotFoundError:
+            print(f"Error: The file '{index_file}' was not found.")
+            sys.exit(1) 
 
 def build_command():
     inverted_index = InvertedIndex()
     inverted_index.build()
     inverted_index.save()
-    doc = inverted_index.get_documents("merida")
-    print(f"First document for token 'merida' = {doc[0]}")
