@@ -62,6 +62,13 @@ def tfidf_command(doc_id: int, term: str) -> float:
     idf = math.log((total_doc_count + 1) / (term_match_doc_count + 1))
     return inverted_index.term_frequencies[doc_id][token] * idf
 
+def bm25_idf_command(term: str)->float:
+    inverted_index = InvertedIndex()
+    inverted_index.load()
+    token = single_token(term)
+    bm25_idf = inverted_index.get_bm25_idf(token)
+    return bm25_idf    
+
 def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool:
     for query_token in query_tokens:
         for title_token in title_tokens:
@@ -164,5 +171,10 @@ class InvertedIndex:
             print(f"Error: The file '{self.termfreq_path}' was not found.")
             sys.exit(1) 
 
+    def get_bm25_idf(self, term: str) -> float:
+        N = len(self.docmap)
+        df = len(self.index[term])
+        bm25_idf = math.log((N - df + 0.5) / (df + 0.5) +1)
+        return bm25_idf
 
 
