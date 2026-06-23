@@ -10,7 +10,8 @@ from .search_utils import (
     DEFAULT_SEARCH_LIMIT, 
     STOPWORDS_PATH, 
     load_movies, 
-    CACHE_DIR
+    CACHE_DIR,
+    BM25_K1
 )
 
 import pickle
@@ -67,7 +68,14 @@ def bm25_idf_command(term: str)->float:
     inverted_index.load()
     token = single_token(term)
     bm25_idf = inverted_index.get_bm25_idf(token)
-    return bm25_idf    
+    return bm25_idf
+
+def bm25_tf_command(doc_id, term, k1=BM25_K1) -> float:
+    inverted_index = InvertedIndex()
+    inverted_index.load()    
+    token = single_token(term)
+    bm25_tf = inverted_index.get_bm25_tf(doc_id, token, k1)
+    return bm25_tf
 
 def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool:
     for query_token in query_tokens:
@@ -177,4 +185,8 @@ class InvertedIndex:
         bm25_idf = math.log((N - df + 0.5) / (df + 0.5) +1)
         return bm25_idf
 
+    def get_bm25_tf(self, doc_id, term, k1=BM25_K1) -> float:
+        tf = self.get_tf(doc_id, term)
+        bm25_tf = (tf * (k1 + 1))/(tf+k1)
+        return bm25_tf
 
