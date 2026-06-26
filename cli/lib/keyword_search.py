@@ -5,6 +5,7 @@ import math
 
 from nltk.stem import PorterStemmer
 from collections import Counter, defaultdict
+from itertools import islice
 
 from .search_utils import (
     DEFAULT_SEARCH_LIMIT, 
@@ -12,7 +13,9 @@ from .search_utils import (
     load_movies, 
     CACHE_DIR,
     BM25_K1,
-    BM25_B
+    BM25_B,
+    SearchResult,
+    format_search_result
 )
 
 import pickle
@@ -77,6 +80,11 @@ def bm25_tf_command(doc_id, term, k1=BM25_K1, b=BM25_B) -> float:
     token = single_token(term)
     bm25_tf = inverted_index.get_bm25_tf(doc_id, token, k1, b)
     return bm25_tf
+
+def bm25search_command(query: str, limit=DEFAULT_SEARCH_LIMIT)->list:
+    inverted_index = InvertedIndex()
+    inverted_index.load()
+    return inverted_index.bm25_search(query, limit)
 
 def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool:
     for query_token in query_tokens:
@@ -209,4 +217,25 @@ class InvertedIndex:
             avg_doc_len = sum(v for v in self.doc_lengths.values())/len(self.doc_lengths)
         return avg_doc_len
 
+    def bm25(self, doc_id, term) -> float:
+        bm25_tf = self.get_bm25_tf(doc_id, term)
+        bm25_idf = self.get_bm25_idf(term)
+        return bm25_tf * bm25_idf
+
+    def bm25_search(self, query, limit) -> list:
+        tokens = tokenize_text(query)
+        score_dict: dict[int, float] = {}
+        for doc_id in self.docmap:
+            doc_score = 0.0
+            for token in tokens:
+                doc_score += self.bm25(doc_id, token)
+            score_dict[doc_id] = doc_score
+        sorted_scores = dict(sorted(score_dict.items(), key=lambda item: item[1], reverse=True))
+        search_results_list: list[SearchResult] = []
+        for doc_id, doc_score in sorted_scores.items():
+            title = self.docmap[doc_id]["title"]
+            document = self.docmap[doc_id]["description"]
+            search_result = format_search_result(doc_id, title, document, doc_score)
+            search_results_list.append(search_result)
+        return search_results_list[:limit]
 
